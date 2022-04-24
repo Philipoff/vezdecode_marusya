@@ -3,14 +3,10 @@ import json
 from flask import Flask, request
 from flask_cors import CORS
 from pymongo import MongoClient
-import ssl
 
 app = Flask(__name__)
 app.debug = True
 CORS(app)
-
-ctx = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
-ctx.load_cert_chain('cert.pem', 'key.pem')
 
 client = MongoClient(
     "mongodb://vcodebackend:vcodebackend@194.67.111.141:27017/vcodebackend?authSource=vcodebackend&readPreference"
@@ -130,4 +126,4 @@ def webhook():
 
 
 if __name__ == '__main__':
-    app.run(ssl_context=ctx, port=7000)
+    app.run(port=7000)
