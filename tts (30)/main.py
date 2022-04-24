@@ -3,10 +3,15 @@ import json
 from flask import Flask, request
 from flask_cors import CORS
 from pymongo import MongoClient
+import ssl
+from random import choice
 
 app = Flask(__name__)
 app.debug = True
 CORS(app)
+
+ctx = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
+ctx.load_cert_chain('cert.pem', 'key.pem')
 
 client = MongoClient(
     "mongodb://vcodebackend:vcodebackend@194.67.111.141:27017/vcodebackend?authSource=vcodebackend&readPreference"
@@ -17,6 +22,11 @@ quiz_collecion = client["vcodebackend"]["quiz"]
 @app.route('/')
 def index():
     return '<h1>Webhook URL = https://127.0.0.1:5000/webhook</h1>'
+
+
+@app.route('/marusya', methods=['POST', 'GET'])
+def marusya():
+    return "Marusya"
 
 
 questions = [
@@ -50,7 +60,7 @@ def webhook():
     text = ''
 
     user_id = request.json["session"]["user_id"]
-    if request.json["session"]["new"]:
+    if quiz_collecion.count_documents({"user_id": user_id}) == 0:
         quiz_collecion.insert_one({'user_id': user_id, "status": 0})
     if request.json['request']['original_utterance'].lower() == "квиз" and \
             not quiz_collecion.find_one({"user_id": user_id})["status"]:
@@ -68,7 +78,7 @@ def webhook():
             question_num += 1
         if user_answer in ["да", "нет", "квиз"]:
             if question_num == 8:
-                text = "Вам подходят следующие категории:\n"
+                text = "Вам подходит следующая категория:\n"
             else:
                 text += f"Вопрос {question_num + 1}. " + questions[question_num]
 
@@ -83,12 +93,14 @@ def webhook():
             if question_num == 8:
                 answers = quiz_collecion.find_one({"user_id": user_id})["answers"]
                 if sum(answers):
+                    chosen_answers = []
                     for i in range(8):
                         if answers[i]:
-                            text += quiz_answers[i] + ", "
-                    text = text[:-2] + "\nУдачи на вездекоде!"
+                            chosen_answers.append(quiz_answers[i])
+                    text += choice(chosen_answers)
                 else:
-                    text = "Вам не подходит ни одна из категорий."
+                    text += choice(quiz_answers)
+                text += "\nУдачи на вездекоде!"
                 quiz_collecion.update_one({'user_id': user_id},
                                           {'$set': {"user_id": user_id,
                                                     "status": 0}})
@@ -117,8 +129,7 @@ def webhook():
         "response": {
             "end_session": end_session,
             "text": text,
-            "tts_type": "ssml",
-            "tts": "Угадайте, чей это голос? <speaker audio=marusia-sounds/game-win-1>"
+            "tts": text
         }
     }
 
@@ -126,4 +137,4 @@ def webhook():
 
 
 if __name__ == '__main__':
-    app.run(port=7000)
+    app.run(ssl_context=ctx)
